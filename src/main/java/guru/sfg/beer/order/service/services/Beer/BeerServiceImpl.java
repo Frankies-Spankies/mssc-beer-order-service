@@ -27,7 +27,7 @@ public class BeerServiceImpl implements BeerService {
     @Override
     public Beer getBeerByUpc(String upc) {
         String url=host+BEER_SERVICE+upc;
-        Beer forObject = restTemplate.getForObject(url, Beer.class);
+        Beer forObject = restTemplate.getForObject(url, Beer.class, false);
         return forObject;
     }
 }
