@@ -83,8 +83,9 @@ public class BeerOrderManagerImpl implements BeerOrderManager {
     }
 
     @Override
-    public void beerOrderAllocationFailed(BeerOrderDto beerOrder) {
-
+    public void beerOrderAllocationFailed(BeerOrderDto beerOrderDto) {
+        BeerOrder beerOrder = beerOrderRepository.getOne(beerOrderDto.getId());
+        sendBeerOrderEvent(beerOrder, BeerOrderEventEnum.ALLOCATION_FAILED);
     }
 
     private void sendBeerOrderEvent(BeerOrder beerOrder, BeerOrderEventEnum beerOrderEventEnum){
