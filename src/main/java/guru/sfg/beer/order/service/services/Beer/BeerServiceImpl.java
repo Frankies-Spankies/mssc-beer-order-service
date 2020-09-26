@@ -13,7 +13,7 @@ import org.springframework.web.client.RestTemplate;
 public class BeerServiceImpl implements BeerService {
 
     private final RestTemplate restTemplate;
-    private final String BEER_SERVICE="/api/v1/beerUpc/";
+    public static final String BEER_SERVICE="/api/v1/beerUpc/";
     private String host;
 
     public BeerServiceImpl(RestTemplateBuilder restTemplateBuilder) {
