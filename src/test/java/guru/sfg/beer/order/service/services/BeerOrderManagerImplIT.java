@@ -4,10 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.github.jenspiegsa.wiremockextension.WireMockExtension;
 import com.github.tomakehurst.wiremock.WireMockServer;
-import guru.sfg.beer.order.service.domain.BeerOrder;
-import guru.sfg.beer.order.service.domain.BeerOrderLine;
-import guru.sfg.beer.order.service.domain.BeerOrderStatusEnum;
-import guru.sfg.beer.order.service.domain.Customer;
+import guru.sfg.beer.order.service.domain.*;
 import guru.sfg.beer.order.service.repositories.BeerOrderRepository;
 import guru.sfg.beer.order.service.repositories.CustomerRepository;
 import guru.sfg.beer.order.service.services.Beer.BeerServiceImpl;
@@ -15,14 +12,21 @@ import guru.sfg.brewery.model.BeerDto;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.Assert;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.RepeatedTest;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.boot.test.mock.mockito.SpyBean;
 import org.springframework.context.annotation.Bean;
+import org.springframework.statemachine.StateMachine;
+import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.TestPropertySource;
 
+import javax.persistence.EntityManager;
+import javax.persistence.Query;
 import javax.transaction.Transactional;
 import java.util.HashSet;
 import java.util.Set;
@@ -32,8 +36,14 @@ import static com.github.jenspiegsa.wiremockextension.ManagedWireMockServer.with
 import static com.github.tomakehurst.wiremock.client.WireMock.get;
 import static com.github.tomakehurst.wiremock.client.WireMock.okJson;
 import static com.github.tomakehurst.wiremock.core.WireMockConfiguration.wireMockConfig;
+import static org.assertj.core.api.BDDAssertions.then;
 import static org.awaitility.Awaitility.await;
 import static org.junit.Assert.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.atLeast;
+import static org.mockito.Mockito.verify;
 
 @Slf4j
 @TestPropertySource(properties = "app.scheduling.enable=false")
@@ -41,7 +51,26 @@ import static org.junit.Assert.*;
 @SpringBootTest
 public class BeerOrderManagerImplIT {
 
-    //Configura un WireMockServer que solo sirve para ese test, i.e cuando el el spring context ejecuta stop, se para el servidor wiremock
+    @Autowired
+    ObjectMapper objectMapper;
+
+    @Autowired
+    WireMockServer wireMockServer;
+
+    @SpyBean
+    BeerOrderManager beerOrderManager;
+
+    @Autowired
+    BeerOrderRepository beerOrderRepository;
+
+
+    @Autowired
+    CustomerRepository customerRepository;
+
+    Customer testCustomer;
+
+    UUID beerId = UUID.randomUUID();
+
     @TestConfiguration
     static class RestTemplateBuilderProvider {
         @Bean(destroyMethod = "stop")
@@ -52,24 +81,6 @@ public class BeerOrderManagerImplIT {
         }
     }
 
-    @Autowired
-    ObjectMapper objectMapper;
-
-    @Autowired
-    WireMockServer wireMockServer;
-
-    @Autowired
-    BeerOrderManager beerOrderManager;
-
-    @Autowired
-    BeerOrderRepository beerOrderRepository;
-
-    @Autowired
-    CustomerRepository customerRepository;
-
-    Customer testCustomer;
-
-
     @BeforeEach
     void setUp() {
         testCustomer = customerRepository.save(Customer.builder()
@@ -77,9 +88,11 @@ public class BeerOrderManagerImplIT {
                 .build());
     }
 
-    @Transactional
+
+
     @Test
-    void testNewToAllocated() throws JsonProcessingException {
+    void testNewToAllocated() throws JsonProcessingException, InterruptedException {
+        log.debug("*Start*");
         BeerDto mockBeerDto = BeerDto.builder().upc("12345").build();
 
         //En este caso se ocupa wiremock y no mockito, ya que se hace un Integration test, por lo que no queremos "simular" una respuesta
@@ -93,22 +106,30 @@ public class BeerOrderManagerImplIT {
 
         BeerOrder savedBeerOrder = beerOrderManager.newBeerOrder(beerOrder);
 
+
         await().untilAsserted(() -> {
-            BeerOrder beerOrderProcessed = beerOrderRepository.getOne(beerOrder.getId());
-            log.debug("Awaiting beerOrder: {}", beerOrderProcessed.getId());
-            assertEquals(BeerOrderStatusEnum.ALLOCATION_PENDING, beerOrderProcessed.getOrderStatus());
+            //verify(beerOrderManager).processValidationResult(any(),any());
+            verify(beerOrderManager).sendBeerOrderEvent(any(),eq(BeerOrderEventEnum.ALLOCATE_ORDER));
         });
-        assertEquals(BeerOrderStatusEnum.ALLOCATED, beerOrder.getOrderStatus());
+
+
+        //!Thread.sleep(1000);
+        //verify(beerOrderManager).processValidationResult(any(),any());
+
+/*        BeerOrder savedBeerOrder2 = beerOrderRepository.findById(savedBeerOrder.getId()).get();
+
+        assertNotNull(savedBeerOrder);
+        assertEquals(BeerOrderStatusEnum.ALLOCATED, savedBeerOrder2.getOrderStatus());*/
     }
 
     public BeerOrder createBeerOrder(){
         BeerOrder beerOrder = BeerOrder.builder()
                 .customer(testCustomer)
-                .orderStatusCallbackUrl("PRUEBA")
                 .build();
 
         Set<BeerOrderLine> lines = new HashSet<>();
         lines.add(BeerOrderLine.builder()
+                .beerId(beerId)
                 .upc("12345")
                 .orderQuantity(1)
                 .beerOrder(beerOrder)

@@ -23,10 +23,7 @@ import lombok.Setter;
 import org.hibernate.annotations.Fetch;
 import org.hibernate.annotations.FetchMode;
 
-import javax.persistence.CascadeType;
-import javax.persistence.Entity;
-import javax.persistence.ManyToOne;
-import javax.persistence.OneToMany;
+import javax.persistence.*;
 import java.sql.Timestamp;
 import java.util.Set;
 import java.util.UUID;
@@ -38,6 +35,7 @@ import java.util.UUID;
 @Setter
 @Entity
 @NoArgsConstructor
+@NamedQuery(query = "Select e from BeerOrder e where e.id = :id", name = "find_beer_order")
 public class BeerOrder extends BaseEntity {
 
     @Builder

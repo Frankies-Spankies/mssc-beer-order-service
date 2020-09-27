@@ -14,13 +14,12 @@ import org.springframework.statemachine.StateMachine;
 import org.springframework.statemachine.config.StateMachineFactory;
 import org.springframework.statemachine.support.DefaultStateMachineContext;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
-import javax.transaction.Transactional;
 import java.util.Optional;
 import java.util.UUID;
 
 @Slf4j
-@Transactional
 @RequiredArgsConstructor
 @Service
 public class BeerOrderManagerImpl implements BeerOrderManager {
@@ -30,38 +29,43 @@ public class BeerOrderManagerImpl implements BeerOrderManager {
     public static final String BEER_ORDER_ID_HEADER = "beerOrder_Id";
     private final BeerOrderStateChangeInterceptor beerOrderStateChangeInterceptor;
 
-
+    @Transactional
     @Override
     public BeerOrder newBeerOrder(BeerOrder beerOrder) {
         beerOrder.setId(null);
         beerOrder.setOrderStatus(BeerOrderStatusEnum.NEW);
-        BeerOrder savedBeerOrder = beerOrderRepository.save(beerOrder);
-        sendBeerOrderEvent(savedBeerOrder, BeerOrderEventEnum.VALIDATE_ORDER);
-        //log.debug("State: newBeerOrder, beerOrderID: {}", savedBeerOrder.getId());
 
-        return savedBeerOrder;
+        BeerOrder savedBeerOrder = beerOrderRepository.saveAndFlush(beerOrder);
+        StateMachine<BeerOrderStatusEnum, BeerOrderEventEnum> sm = sendBeerOrderEvent(savedBeerOrder, BeerOrderEventEnum.VALIDATE_ORDER);
+        log.debug("State: newBeerOrder, beerOrderID: {}", savedBeerOrder.getId());
+
+        return beerOrder;
 
     }
 
+    @Transactional
     @Override
     public void processValidationResult(UUID beerOrderId, Boolean isValid) {
         log.debug("State: processValidationResult, beerOrderId: {}", beerOrderId);
-        Optional<BeerOrder> beerOrderOptional = Optional.of(beerOrderRepository.getOne(beerOrderId));
-
+        beerOrderRepository.getOne(beerOrderId);
+        log.debug("beerOrderOptional");
+        Optional<BeerOrder> beerOrderOptional = beerOrderRepository.findById(beerOrderId);
         beerOrderOptional.ifPresentOrElse(beerOrder -> {
-            if (isValid) {
-                log.debug("isValid in");
+            if(isValid){
+
                 sendBeerOrderEvent(beerOrder, BeerOrderEventEnum.VALIDATION_PASSED);
-                log.debug("isValid out");
+                log.debug("VALIDATION_PASSED");
+
                 BeerOrder validatedOrder = beerOrderRepository.findById(beerOrderId).get();
 
-
                 sendBeerOrderEvent(validatedOrder, BeerOrderEventEnum.ALLOCATE_ORDER);
+                log.debug("ALLOCATE_ORDER");
+
             } else {
                 sendBeerOrderEvent(beerOrder, BeerOrderEventEnum.VALIDATION_FAILED);
             }
-        },
-        () -> log.error("Order Not Found. Id: " + beerOrderId));
+        }, () -> log.error("Order Not Found. Id: " + beerOrderId));
+
     }
 
     @Override
@@ -99,19 +103,19 @@ public class BeerOrderManagerImpl implements BeerOrderManager {
         sendBeerOrderEvent(beerOrder, BeerOrderEventEnum.ALLOCATION_FAILED);
     }
 
-    private void sendBeerOrderEvent(BeerOrder beerOrder, BeerOrderEventEnum beerOrderEventEnum) {
+    @Override
+    public StateMachine<BeerOrderStatusEnum, BeerOrderEventEnum> sendBeerOrderEvent(BeerOrder beerOrder, BeerOrderEventEnum beerOrderEventEnum) {
         StateMachine<BeerOrderStatusEnum, BeerOrderEventEnum> sm = build(beerOrder);
 
         Message msg = MessageBuilder.withPayload(beerOrderEventEnum)
                 .setHeader(BEER_ORDER_ID_HEADER, beerOrder.getId())
                 .build();
 
-
         sm.sendEvent(msg);
+        return sm;
     }
 
-    private StateMachine<BeerOrderStatusEnum, BeerOrderEventEnum> build(BeerOrder beerOrder) {
-
+    public StateMachine<BeerOrderStatusEnum, BeerOrderEventEnum> build(BeerOrder beerOrder){
         StateMachine<BeerOrderStatusEnum, BeerOrderEventEnum> sm = stateMachineFactory.getStateMachine(beerOrder.getId());
 
         sm.stop();
