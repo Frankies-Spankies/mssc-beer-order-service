@@ -35,7 +35,6 @@ import java.util.UUID;
 @Setter
 @Entity
 @NoArgsConstructor
-@NamedQuery(query = "Select e from BeerOrder e where e.id = :id", name = "find_beer_order")
 public class BeerOrder extends BaseEntity {
 
     @Builder
