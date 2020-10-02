@@ -80,11 +80,10 @@ public class BeerOrderManagerImplIT {
     }
 
 
-
     /**
-    *En este caso se ocupa wiremock y no mockito, ya que se hace un Integration test, por lo que no queremos "simular" una respuesta
-    *por parte de este servicio, sin embargo si se nescesita una respuesta de un servicio externo en esta prueba
-    */
+     * En este caso se ocupa wiremock y no mockito, ya que se hace un Integration test, por lo que no queremos "simular" una respuesta
+     * por parte de este servicio, sin embargo si se nescesita una respuesta de un servicio externo en esta prueba
+     */
     @DirtiesContext
     @RepeatedTest(10)
     void testNewToAllocated() throws JsonProcessingException {
@@ -92,7 +91,7 @@ public class BeerOrderManagerImplIT {
         BeerDto mockBeerDto = BeerDto.builder().upc("12345").build();
 
         wireMockServer.stubFor(
-                get(BeerServiceImpl.BEER_SERVICE+"12345")
+                get(BeerServiceImpl.BEER_SERVICE + "12345")
                         .willReturn(okJson(objectMapper.writeValueAsString(mockBeerDto)))
         );
 
@@ -124,6 +123,75 @@ public class BeerOrderManagerImplIT {
         assertEquals(BeerOrderStatusEnum.ALLOCATED, savedBeerOrder2.getOrderStatus());*/
     }
 
+
+    @Test
+    void testFailedValidation() throws JsonProcessingException {
+        log.debug("*Start*");
+        BeerDto mockBeerDto = BeerDto.builder().upc("12345").build();
+
+        wireMockServer.stubFor(
+                get(BeerServiceImpl.BEER_SERVICE + "12345")
+                        .willReturn(okJson(objectMapper.writeValueAsString(mockBeerDto)))
+        );
+
+        BeerOrder beerOrder = createBeerOrder();
+        beerOrder.setCustomerRef("fail-validation");
+
+        BeerOrder savedBeerOrder = beerOrderManager.newBeerOrder(beerOrder);
+
+
+        await().untilAsserted(() -> {
+            BeerOrder foundOrder = beerOrderRepository.findById(beerOrder.getId()).get();
+            assertEquals(BeerOrderStatusEnum.ALLOCATION_EXCEPTION, foundOrder.getOrderStatus());
+        });
+    }
+
+    @Test
+    void testPartialAllocation() throws JsonProcessingException {
+        log.debug("*Start*");
+        BeerDto mockBeerDto = BeerDto.builder().upc("12345").build();
+
+        wireMockServer.stubFor(
+                get(BeerServiceImpl.BEER_SERVICE + "12345")
+                        .willReturn(okJson(objectMapper.writeValueAsString(mockBeerDto)))
+        );
+
+        BeerOrder beerOrder = createBeerOrder();
+        beerOrder.setCustomerRef("partial-allocation");
+
+        BeerOrder savedBeerOrder = beerOrderManager.newBeerOrder(beerOrder);
+
+
+        await().untilAsserted(() -> {
+            BeerOrder foundOrder = beerOrderRepository.findById(beerOrder.getId()).get();
+            assertEquals(BeerOrderStatusEnum.PENDING_INVENTORY, foundOrder.getOrderStatus());
+        });
+
+    }
+
+    @Test
+    void testFailedAllocation() throws JsonProcessingException {
+        log.debug("*Start*");
+        BeerDto mockBeerDto = BeerDto.builder().upc("12345").build();
+
+        wireMockServer.stubFor(
+                get(BeerServiceImpl.BEER_SERVICE + "12345")
+                        .willReturn(okJson(objectMapper.writeValueAsString(mockBeerDto)))
+        );
+
+        BeerOrder beerOrder = createBeerOrder();
+        beerOrder.setCustomerRef("fail-allocation");
+
+        BeerOrder savedBeerOrder = beerOrderManager.newBeerOrder(beerOrder);
+
+
+        await().untilAsserted(() -> {
+            BeerOrder foundOrder = beerOrderRepository.findById(beerOrder.getId()).get();
+            assertEquals(BeerOrderStatusEnum.ALLOCATION_EXCEPTION, foundOrder.getOrderStatus());
+        });
+
+    }
+
     @Test
     void testNewToPickedUp() throws JsonProcessingException {
         BeerDto beerDto = BeerDto.builder().id(beerId).upc("12345").build();
@@ -152,7 +220,7 @@ public class BeerOrderManagerImplIT {
         assertEquals(BeerOrderStatusEnum.PICKED_UP, pickedUpOrder.getOrderStatus());
     }
 
-    public BeerOrder createBeerOrder(){
+    public BeerOrder createBeerOrder() {
         BeerOrder beerOrder = BeerOrder.builder()
                 .customer(testCustomer)
                 .build();

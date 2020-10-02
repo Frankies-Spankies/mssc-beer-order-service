@@ -24,10 +24,10 @@ import java.util.UUID;
 @Service
 
 /**
-* El Spring state machine funciona en threads distintos a los que se ocupan el thread principal,
-*  el thread que busca y guarda cosas en BD y el del listener de Jms
-* por lo que hay que tener en cuenta esto al hacer test, ya que puede pasar que un thread que se espera que acabe despues de
-* recibir una respuesta termine antes de que p.e se guarde algo en bd termine antes y obtenga una lectura en bd incorrecta
+ * El Spring state machine funciona en threads distintos a los que se ocupan el thread principal,
+ *  el thread que busca y guarda cosas en BD y el del listener de Jms
+ * por lo que hay que tener en cuenta esto al hacer test, ya que puede pasar que un thread que se espera que acabe despues de
+ * recibir una respuesta termine antes de que p.e se guarde algo en bd termine antes y obtenga una lectura en bd incorrecta
  * */
 public class BeerOrderManagerImpl implements BeerOrderManager {
 
@@ -87,10 +87,12 @@ public class BeerOrderManagerImpl implements BeerOrderManager {
 
     @Override
     public void beerOrderAllocationPendingInventory(BeerOrderDto beerOrderDto) {
-        BeerOrder beerOrder = beerOrderRepository.getOne(beerOrderDto.getId());
-        sendBeerOrderEvent(beerOrder, BeerOrderEventEnum.ALLOCATION_NO_INVENTORY);
+        Optional<BeerOrder> beerOrderOptional = beerOrderRepository.findById(beerOrderDto.getId());
 
-        updateAllocatedQty(beerOrderDto);
+        beerOrderOptional.ifPresentOrElse(beerOrder -> {
+            sendBeerOrderEvent(beerOrder, BeerOrderEventEnum.ALLOCATION_NO_INVENTORY);
+            updateAllocatedQty(beerOrderDto);
+        }, () -> log.error("Order Not Found. Id: " + beerOrderDto.getId()));
     }
 
     @Transactional
@@ -112,8 +114,10 @@ public class BeerOrderManagerImpl implements BeerOrderManager {
 
     @Override
     public void beerOrderAllocationFailed(BeerOrderDto beerOrderDto) {
-        BeerOrder beerOrder = beerOrderRepository.getOne(beerOrderDto.getId());
-        sendBeerOrderEvent(beerOrder, BeerOrderEventEnum.ALLOCATION_FAILED);
+        Optional<BeerOrder> beerOrderOptional = beerOrderRepository.findById(beerOrderDto.getId());
+        beerOrderOptional.ifPresentOrElse(beerOrder -> {
+            sendBeerOrderEvent(beerOrder, BeerOrderEventEnum.ALLOCATION_FAILED);
+        }, () -> log.error("Order Not Found. Id: " + beerOrderDto.getId()));
     }
 
     @Override
