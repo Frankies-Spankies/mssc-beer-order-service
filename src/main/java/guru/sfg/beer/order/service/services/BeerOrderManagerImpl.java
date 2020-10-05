@@ -16,6 +16,7 @@ import org.springframework.statemachine.support.DefaultStateMachineContext;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import javax.persistence.EntityManager;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -36,6 +37,8 @@ public class BeerOrderManagerImpl implements BeerOrderManager {
     public static final String BEER_ORDER_ID_HEADER = "beerOrder_Id";
     private final BeerOrderStateChangeInterceptor beerOrderStateChangeInterceptor;
 
+    private final EntityManager entityManager;
+
     @Transactional
     @Override
     public BeerOrder newBeerOrder(BeerOrder beerOrder) {
@@ -54,7 +57,8 @@ public class BeerOrderManagerImpl implements BeerOrderManager {
     @Override
     public void processValidationResult(UUID beerOrderId, Boolean isValid) {
         log.debug("State: processValidationResult, beerOrderId: {}", beerOrderId);
-        beerOrderRepository.getOne(beerOrderId);
+        //LIbera todas las operaciones que estaban en el persitence context a BD
+        entityManager.flush();
         Optional<BeerOrder> beerOrderOptional = beerOrderRepository.findById(beerOrderId);
         beerOrderOptional.ifPresentOrElse(beerOrder -> {
             if (isValid) {
@@ -124,10 +128,19 @@ public class BeerOrderManagerImpl implements BeerOrderManager {
     public void beerOrderPickedUp(UUID id) {
         Optional<BeerOrder> beerOrderOptional = beerOrderRepository.findById(id);
 
-        beerOrderOptional.ifPresentOrElse(beerOrder -> {
+        beerOrderRepository.findById(id).ifPresentOrElse(beerOrder -> {
             //do process
             sendBeerOrderEvent(beerOrder, BeerOrderEventEnum.BEERORDER_PICKED_UP);
         }, () -> log.error("Order Not Found. Id: " + id));
+    }
+
+    @Override
+    public void cancelOrder(UUID id) {
+        log.debug("Canceling Order: {}", id);
+        beerOrderRepository.findById(id).ifPresentOrElse(beerOrder -> {
+            sendBeerOrderEvent(beerOrder, BeerOrderEventEnum.CANCEL_ORDER);
+        }, () -> log.error("Order Not Found. Id: " + id));
+        log.debug("Cancelled *****");
     }
 
     @Override

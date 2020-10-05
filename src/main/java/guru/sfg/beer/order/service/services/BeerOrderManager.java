@@ -23,4 +23,6 @@ public interface BeerOrderManager {
     StateMachine<BeerOrderStatusEnum, BeerOrderEventEnum> sendBeerOrderEvent(BeerOrder beerOrder, BeerOrderEventEnum beerOrderEventEnum);
 
     void beerOrderPickedUp(UUID id);
+
+    void cancelOrder(UUID id);
 }
