@@ -129,6 +129,7 @@ public class BeerOrderManagerImplIT {
     }
 
     /**
+     *
      * Version mock
      * Verifica mediante un spy que se haya ejecutado el metodo beerOrderAllocationPassed()
      * En este caso se ocupa wiremock y no mockito, ya que se hace un Integration test, por lo que no queremos "simular" una respuesta
