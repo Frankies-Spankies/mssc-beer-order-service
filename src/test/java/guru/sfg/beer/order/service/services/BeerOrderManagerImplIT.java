@@ -15,6 +15,7 @@ import guru.sfg.brewery.model.events.DeallocateOrderRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.jgroups.util.Util;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.RepeatedTest;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -95,8 +96,7 @@ public class BeerOrderManagerImplIT {
      * En este caso se ocupa wiremock y no mockito, ya que se hace un Integration test, por lo que no queremos "simular" una respuesta
      * por parte de este servicio, sin embargo si se nescesita una respuesta de un servicio externo en esta prueba
      */
-    @DirtiesContext
-    @RepeatedTest(10)
+    @Test
     void testNewToAllocatedDB() throws JsonProcessingException, InterruptedException {
         BeerDto beerDto = BeerDto.builder().id(beerId).upc("12345").build();
 
@@ -135,6 +135,7 @@ public class BeerOrderManagerImplIT {
      * En este caso se ocupa wiremock y no mockito, ya que se hace un Integration test, por lo que no queremos "simular" una respuesta
      * por parte de este servicio, sin embargo si se nescesita una respuesta de un servicio externo en esta prueba
      */
+    @Disabled
     @DirtiesContext
     @RepeatedTest(10)
     void testNewToAllocatedMock() throws JsonProcessingException {
