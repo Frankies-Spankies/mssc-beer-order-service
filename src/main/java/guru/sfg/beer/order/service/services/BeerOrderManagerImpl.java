@@ -60,7 +60,7 @@ public class BeerOrderManagerImpl implements BeerOrderManager {
     public void processValidationResult(UUID beerOrderId, Boolean isValid) {
         log.debug("State: processValidationResult, beerOrderId: {}", beerOrderId);
         //LIbera todas las operaciones que estaban en el persitence context a BD
-        //entityManager.flush();
+        entityManager.flush();
         Optional<BeerOrder> beerOrderOptional = beerOrderRepository.findById(beerOrderId);
         beerOrderOptional.ifPresentOrElse(beerOrder -> {
             if (isValid) {
